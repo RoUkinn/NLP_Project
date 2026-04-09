@@ -16,9 +16,7 @@ css = """
 }
 /* 标题渐变色与阴影特效 (沉稳的深空蓝紫) */
 h1 {
-    background: -webkit-linear-gradient(45deg, #2b5876, #4e4376);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: #2b5876 !important;
     font-weight: 800 !important;
     letter-spacing: -0.5px;
     padding-bottom: 5px;
