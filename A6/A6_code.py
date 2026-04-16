@@ -1,4 +1,9 @@
 import os
+import warnings
+# 忽略常规的警告，清理冗余输出日志
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
+
 # 防御云端容器物理核心调度的终极防线，解决 Tokenizer 信号量泄露与张量矩阵 Segfault 内存溢出
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
@@ -8,9 +13,13 @@ import streamlit as st
 import pandas as pd
 import torch
 import torch.nn as nn
+# 显式限制 Pytorch 的线程数，这能极大避免 Streamlit 实例出现 Segfault 以及内存/信号量泄漏问题
+torch.set_num_threads(1)
 import time
 import nltk
-from transformers import pipeline
+from transformers import pipeline, logging as hf_logging
+# 忽略模型尚未 fine-tune 的警告 (Some weights were not used...)
+hf_logging.set_verbosity_error()
 from nltk.tokenize import word_tokenize
 from nltk.lm.preprocessing import padded_everygram_pipeline, pad_both_ends
 from nltk.lm import MLE, Laplace
@@ -128,19 +137,19 @@ with st.sidebar:
     st.markdown("<h2 style='text-align: center; margin-top: -10px; font-size: 1.8em;'>🧭 探索导航</h2>", unsafe_allow_html=True)
     st.markdown("<hr style='border: 0; height: 1px; background-image: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0)); margin: 10px 0 20px 0;'>", unsafe_allow_html=True)
     
-    if st.button(PAGE_1, use_container_width=True, type="primary" if st.session_state.current_page == PAGE_1 else "secondary"):
+    if st.button(PAGE_1, width="stretch", type="primary" if st.session_state.current_page == PAGE_1 else "secondary"):
         st.session_state.current_page = PAGE_1
         st.rerun()
         
-    if st.button(PAGE_2, use_container_width=True, type="primary" if st.session_state.current_page == PAGE_2 else "secondary"):
+    if st.button(PAGE_2, width="stretch", type="primary" if st.session_state.current_page == PAGE_2 else "secondary"):
         st.session_state.current_page = PAGE_2
         st.rerun()
         
-    if st.button(PAGE_3, use_container_width=True, type="primary" if st.session_state.current_page == PAGE_3 else "secondary"):
+    if st.button(PAGE_3, width="stretch", type="primary" if st.session_state.current_page == PAGE_3 else "secondary"):
         st.session_state.current_page = PAGE_3
         st.rerun()
 
-    if st.button(PAGE_4, use_container_width=True, type="primary" if st.session_state.current_page == PAGE_4 else "secondary"):
+    if st.button(PAGE_4, width="stretch", type="primary" if st.session_state.current_page == PAGE_4 else "secondary"):
         st.session_state.current_page = PAGE_4
         st.rerun()
 
@@ -255,7 +264,7 @@ if st.session_state.current_page == PAGE_1:
                     return ['background-color: rgba(239, 68, 68, 0.15); color: #b91c1c; font-weight: bold'] * len(row)
                 return [''] * len(row)
                 
-            st.dataframe(df.style.apply(highlight_zero_frequency, axis=1), use_container_width=True)
+            st.dataframe(df.style.apply(highlight_zero_frequency, axis=1), width="stretch")
             
             st.markdown("#### 🎯 序列句际全局评分 (Joint Probability)")
             
@@ -344,7 +353,7 @@ elif st.session_state.current_page == PAGE_2:
         def init_hidden(self, batch_size):
             return torch.zeros(1, batch_size, self.hidden_size)
 
-    if st.button("🚀 开始编译并训练 RNN 网络模型", use_container_width=True, type="primary"):
+    if st.button("🚀 开始编译并训练 RNN 网络模型", width="stretch", type="primary"):
         if not poem_text.strip():
             st.error("您尚未注入任何文本语料，请补全后重试！")
         else:
@@ -420,7 +429,7 @@ elif st.session_state.current_page == PAGE_2:
                 seed_input = st.text_input("注入前置引子 (Seed Prompt):", value=seed_char)
             with btn_col:
                 st.markdown("<br>", unsafe_allow_html=True)
-                gen_btn = st.button("🪄 连环生成 200 个自回归预测字符", use_container_width=True)
+                gen_btn = st.button("🪄 连环生成 200 个自回归预测字符", width="stretch")
             
         if gen_btn:
             if not seed_input:
@@ -505,7 +514,7 @@ elif st.session_state.current_page == PAGE_3:
             
             mask_text = st.text_area("注入时空穿梭探针 (必须留有 `[MASK]` 坑位):", value="The man went to the [MASK] to buy some milk.", height=125)
             
-            if st.button("🔍 引爆 BERT 分析器", use_container_width=True):
+            if st.button("🔍 引爆 BERT 分析器", width="stretch"):
                 if "[MASK]" not in mask_text:
                     st.warning("⚠️ 安全拦截：雷达探测到您的句子中根本没有留下 `[MASK]` 标签占位！BERT 无处降落发力！")
                 else:
@@ -532,7 +541,7 @@ elif st.session_state.current_page == PAGE_3:
             
             gpt_text = st.text_area("投喂单向引理种子 (Seed Prompt):", value="The man went to the", height=125)
             
-            if st.button("🪄 启动 GPT-2 神经元暴走生成", use_container_width=True):
+            if st.button("🪄 启动 GPT-2 神经元暴走生成", width="stretch"):
                 if not gpt_text.strip():
                     st.error("起底前置引子为空！无法引发连锁反应！")
                 else:
@@ -594,7 +603,7 @@ elif st.session_state.current_page == PAGE_4:
         st.markdown("#### 2. 学术标尺投影")
         st.latex(r"PPL(W) = \exp \left( \frac{1}{N} \sum_{i=1}^{N} -\log P(w_i | w_1...w_{i-1}) \right)")
         
-        if st.button("📊 重核计算全列困惑度 (Calculate Auto-regressive PPL)", use_container_width=True, type="primary"):
+        if st.button("📊 重核计算全列困惑度 (Calculate Auto-regressive PPL)", width="stretch", type="primary"):
             sentences = [s.strip() for s in text_lines.split("\n") if s.strip()]
             
             if not sentences:
@@ -646,7 +655,7 @@ elif st.session_state.current_page == PAGE_4:
             }).apply(highlight_ppl, subset=["困惑度 (Perplexity)"])
             
             st.markdown("#### 3. 张量微积解算盘")
-            st.dataframe(df_styled, use_container_width=True)
+            st.dataframe(df_styled, width="stretch")
             
             # 总结式 AI 分析框
             st.info("💡 **高维可解释性分析简报**：\n\n数据热力场非常清晰地剥离了句法的难度维度！\n- 当遭遇如同 `The weather is very beautiful` 这样的高频习惯发音句，损失极地，PPL 指数呈深绿色健康底色，代表模型对其对答如流，“毫不困惑”。\n- 而针对**强行语法倒装、乱序拼凑的乱码**，或者**包含极其冷僻、突兀堆叠的学术概念的长尾长句**，语言模型在每一步踩碎下一步词汇时都步履维艰、疯狂猜错（巨大的累加对数损失 $Loss$），从而被指数计算法则剧烈放大，直接飙红爆炸出几千乃至上万的惊天 PPL！这也是工业界排查垃圾刷榜文本的照妖镜。")
