@@ -1,3 +1,9 @@
+import os
+# 防御云端容器物理核心调度的终极防线，解决 Tokenizer 信号量泄露与张量矩阵 Segfault 内存溢出
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 import streamlit as st
 import pandas as pd
 import torch
@@ -470,22 +476,25 @@ elif st.session_state.current_page == PAGE_3:
     st.markdown("### 🆚 预训练架构终极对决：Masked LM vs. Causal LM")
     st.markdown("本模块通过真实调用行业开源标杆预训练模型，深度体验 **双向上下文补全 (BERT)** 与 **单向时序自回归流式生成 (GPT-2)** 在基座机理上的本质区别。")
     
-    # === 极危防御：超大参数模型防重载并发缓冲层 ===
-    @st.cache_resource(show_spinner="⏳ 首次加载千兆级大参数预训练模型中 (后台正在下载 BERT 与 GPT-2 权重矩阵，耗时约1-2分钟请耐心等待)...")
-    def load_pipelines():
+    # === 极危防御：超大参数模型防重载缓冲层拆分解耦 ===
+    # 彻底废除并发把俩模型一起拉入内存的操作，改为“谁按按钮谁加载”的惰性懒加载模型，砍掉 50% 内存峰值。
+    @st.cache_resource(show_spinner="⏳ 左脑苏醒中：加载双向完形填空大模型矩阵 (BERT)...")
+    def load_bert_pipeline():
         try:
-            # 引入最经典的遮蔽预言机
-            mask_filler = pipeline("fill-mask", model="bert-base-uncased")
-            # 引入最经典的短文生成机（禁用旧版生成截断告警）
-            text_generator = pipeline("text-generation", model="gpt2")
-            return mask_filler, text_generator
+            return pipeline("fill-mask", model="bert-base-uncased")
         except Exception as e:
-            st.error(f"❌ 加载 Hugging Face 远程权重时遭遇严重的网络或内存读写异常。异常日志：{e}")
-            return None, None
+            st.error(f"❌ 加载 BERT 远程权重异常：{e}")
+            return None
+
+    @st.cache_resource(show_spinner="⏳ 右脑苏醒中：加载单向自回归大模型矩阵 (GPT-2)...")
+    def load_gpt2_pipeline():
+        try:
+            return pipeline("text-generation", model="gpt2")
+        except Exception as e:
+            st.error(f"❌ 加载 GPT-2 远程权重异常：{e}")
+            return None
             
-    mask_filler, text_generator = load_pipelines()
-    
-    if mask_filler and text_generator:
+    if True: # 保持原有的嵌套缩进
         # 使用并排对称版式渲染强烈的实验对垒氛围
         col_bert, col_gpt2 = st.columns(2, gap="large")
         
@@ -501,7 +510,9 @@ elif st.session_state.current_page == PAGE_3:
                     st.warning("⚠️ 安全拦截：雷达探测到您的句子中根本没有留下 `[MASK]` 标签占位！BERT 无处降落发力！")
                 else:
                     with st.spinner("BERT 正在逆向拆解前后文联结律..."):
-                        st.session_state.m3_bert_preds = mask_filler(mask_text)
+                        mask_filler = load_bert_pipeline()
+                        if mask_filler:
+                            st.session_state.m3_bert_preds = mask_filler(mask_text)
                         
             if st.session_state.get("m3_bert_preds"):
                 st.markdown("<br><b>🏆 预测置信度 Top-5 分布靶场：</b>", unsafe_allow_html=True)
@@ -526,14 +537,16 @@ elif st.session_state.current_page == PAGE_3:
                     st.error("起底前置引子为空！无法引发连锁反应！")
                 else:
                     with st.spinner("GPT-2 单向自回归幻觉脑补编织中..."):
-                        # 设置保护参数，防止大模型陷入复读机或无限暴走撑爆内存
-                        gen_res = text_generator(
-                            gpt_text, 
-                            max_new_tokens=20, 
-                            pad_token_id=50256, 
-                            num_return_sequences=1
-                        )
-                        st.session_state.m3_gpt2_preds = gen_res[0]['generated_text']
+                        text_generator = load_gpt2_pipeline()
+                        if text_generator:
+                            # 设置保护参数，防止大模型陷入复读机或无限暴走撑爆内存
+                            gen_res = text_generator(
+                                gpt_text, 
+                                max_new_tokens=20, 
+                                pad_token_id=50256, 
+                                num_return_sequences=1
+                            )
+                            st.session_state.m3_gpt2_preds = gen_res[0]['generated_text']
                         
             if st.session_state.get("m3_gpt2_preds"):
                 full_text = st.session_state.m3_gpt2_preds
